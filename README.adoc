@@ -10,6 +10,14 @@ Follow the instructions here to set up a google app API and connect the app by d
 
 https://developers.google.com/gmail/api/quickstart/python
 
+### Create the calendar
+
+Create a google calendar to use for your work hours log.
+
+It is good practice to use a calendar for only this purpose.
+
+The default calendar name used by the app is: "Work Hours"
+
 ### Planned Work hours
 
 Configure your expected work hours in a yaml file on the format
