@@ -2,7 +2,7 @@
 
 import unittest
 
-from utils import events as events_graph
+from utils import event_utils
 
 
 class TestEvents(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestEvents(unittest.TestCase):
             }
         ]
         self.assertEqual(
-            events_graph.graph(events), "[]        WWWWWWWWWWWWWWWW            []"
+            event_utils.graph(events), "[]        WWWWWWWWWWWWWWWW            []"
         )
 
         # Two event
@@ -38,7 +38,7 @@ class TestEvents(unittest.TestCase):
             },
         ]
         self.assertEqual(
-            events_graph.graph(events), "[]WWWWWWWW                WWWW        []"
+            event_utils.graph(events), "[]WWWWWWWW                WWWW        []"
         )
 
         # Testing edge
@@ -50,7 +50,7 @@ class TestEvents(unittest.TestCase):
             }
         ]
         self.assertEqual(
-            events_graph.graph(events), "[]         WWWWWWWWWWWWWWW            []"
+            event_utils.graph(events), "[]         WWWWWWWWWWWWWWW            []"
         )
 
         events = [
@@ -61,7 +61,7 @@ class TestEvents(unittest.TestCase):
             }
         ]
         self.assertEqual(
-            events_graph.graph(events), "[]        WWWWWWWWWWWWWWWW            []"
+            event_utils.graph(events), "[]        WWWWWWWWWWWWWWWW            []"
         )
 
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
 import datetime
 import pytz
 import sys
@@ -9,7 +8,7 @@ import argparse
 import yaml
 from string import Template
 
-from utils import events
+from utils import event_utils
 
 from google_calendar import cal
 
@@ -68,7 +67,7 @@ class WorkHours:
         for event in events:
             if event["summary"] in FULLDAYOFFS:
                 duration = duration + self.planned(
-                    events.get_datetime(event, "start").date()
+                    event_utils.get_datetime(event, "start").date()
                 )
             elif event["summary"] not in IGNORED:
                 duration = duration + event_duration(event)
@@ -78,7 +77,7 @@ class WorkHours:
         today = datetime.datetime.now().date()
         calendar_id = cal.get_calendar_id(self.service, self.args.calendar)
         all_events = cal.get_all_events(self.service, calendar_id)
-        events_on_day = events.get_events_on_date(all_events, today)
+        events_on_day = event_utils.get_events_on_date(all_events, today)
         total_worktime = self.total_worktime(events_on_day)
         print(
             f"\nTotal time worked today: {total_worktime}/{self.planned(today)}",
@@ -121,7 +120,7 @@ class WorkHours:
                     )
                 acc_time_diff_month = 0.0
 
-            day_events = events.get_events_on_date(all_events, date)
+            day_events = event_utils.get_events_on_date(all_events, date)
             worktime = self.total_worktime(day_events)
             acc_time_diff_total += time_diff(worktime, self.planned(date))
             acc_time_diff_week += time_diff(worktime, self.planned(date))
@@ -135,7 +134,7 @@ class WorkHours:
                     date,
                     format_timedelta(worktime),
                     format_time_diff(time_diff(worktime, self.planned(date))),
-                    events.graph(
+                    event_utils.graph(
                         day_events,
                         start=datetime.time(0, 0, 0),
                         end=datetime.time(23, 59, 59),
@@ -189,7 +188,7 @@ def start(args, service, wh):
     if len(ongoing_events) > 0:
         print("There are {} ongoing evnts, consider stopping them before starting new.")
         for event in ongoing_events:
-            print(events.format_event(event))
+            print(event_utils.format_event(event))
         if len(ongoing_events) == 1:
             if query_yes_no("Stop the ongoing event at this time", default="no"):
                 utc = pytz.timezone("UTC")
@@ -230,7 +229,7 @@ def stop(args, service, wh):
 
     # Show suggested event
     print("Event to update:")
-    print(events.format_event(event))
+    print(event_utils.format_event(event))
 
     # Confirm update
     if args.force or query_yes_no("Stop that event", "no"):
@@ -250,7 +249,7 @@ def find_ongoing_events(service, args):
     possible_events = []
     for event in all_events:
         if event_duration(event).total_seconds() == 0.0:
-            possible_events.append(event)
+            possible_event_utils.append(event)
     return possible_events
 
 
@@ -327,7 +326,7 @@ def update(args, service, wh):
     calendar_id = cal.get_calendar_id(service, args.calendar)
     event = service.events().get(calendar_id=calendar_id, eventId=args.id).execute()
     print("Replace event")
-    print(events.format_event(event))
+    print(event_utils.format_event(event))
     print("with:")
     new_event = patch_event(event, args)
     print(new_event)
@@ -349,7 +348,7 @@ def filter_events(events, start, end):
     for event in events:
         event_start = get_datetime(event, "start")
         if event_start.date() >= start.date() and event_start.date() <= end.date():
-            ret_events.append(event)
+            ret_event_utils.append(event)
     return ret_events
 
 
@@ -365,7 +364,7 @@ def delete(args, service, wh):
         calendar_id = cal.get_calendar_id(service, args.calendar)
         event = service.events().get(calendar_id=calendar_id, eventId=id).execute()
         print("Delete event")
-        print(events.format_event(event))
+        print(event_utils.format_event(event))
         if args.force or query_yes_no("Delete the above evetn?", default="no"):
             service.events().delete(calendar_id=calendar_id, eventId=id).execute()
 
