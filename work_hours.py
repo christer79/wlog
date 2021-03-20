@@ -3,7 +3,6 @@
 from __future__ import print_function
 import datetime
 import pytz
-import csv
 import sys
 import math
 import argparse
