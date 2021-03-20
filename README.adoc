@@ -6,7 +6,7 @@ A work hours time keeper using a google calendar as database.
 
 ### Google API connection
 
-Follow the instructions here to set up a google app API and connect the app by dropping your credentials.json file in the folder.
+Follow the instructions here to set up a google app API and connect the app by dropping your credentials.json file in the google-calendar module folder.
 
 https://developers.google.com/gmail/api/quickstart/python
 
