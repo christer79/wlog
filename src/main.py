@@ -9,8 +9,11 @@ import argparse
 import yaml
 from string import Template
 
+from utils import events
 
-from cal import get_all_events, get_calendar_id, authenticate
+from google_calendar import cal
+
+# cal.get_all_events, cal.get_calendar_id, cal.authenticate
 
 FULLDAYOFFS = [
     "VACATION",
@@ -60,11 +63,22 @@ class WorkHours:
                 duration = duration + event_duration(event)
         return duration
 
+    def total_worktime(self, events):
+        duration = datetime.timedelta()
+        for event in events:
+            if event["summary"] in FULLDAYOFFS:
+                duration = duration + self.planned(
+                    events.get_datetime(event, "start").date()
+                )
+            elif event["summary"] not in IGNORED:
+                duration = duration + event_duration(event)
+        return duration
+
     def day_summary(self):
         today = datetime.datetime.now().date()
-        calendar_id = get_calendar_id(self.service, self.args.calendar)
-        all_events = get_all_events(self.service, calendar_id)
-        events_on_day = get_events_on_date(all_events, today)
+        calendar_id = cal.get_calendar_id(self.service, self.args.calendar)
+        all_events = cal.get_all_events(self.service, calendar_id)
+        events_on_day = events.get_events_on_date(all_events, today)
         total_worktime = self.total_worktime(events_on_day)
         print(
             f"\nTotal time worked today: {total_worktime}/{self.planned(today)}",
@@ -72,8 +86,8 @@ class WorkHours:
         )
 
     def summary(self):
-        calendar_id = get_calendar_id(self.service, self.args.calendar)
-        all_events = get_all_events(self.service, calendar_id)
+        calendar_id = cal.get_calendar_id(self.service, self.args.calendar)
+        all_events = cal.get_all_events(self.service, calendar_id)
 
         # The size of each step in days
         day_delta = datetime.timedelta(days=1)
@@ -107,7 +121,7 @@ class WorkHours:
                     )
                 acc_time_diff_month = 0.0
 
-            day_events = get_events_on_date(all_events, date)
+            day_events = events.get_events_on_date(all_events, date)
             worktime = self.total_worktime(day_events)
             acc_time_diff_total += time_diff(worktime, self.planned(date))
             acc_time_diff_week += time_diff(worktime, self.planned(date))
@@ -121,7 +135,7 @@ class WorkHours:
                     date,
                     format_timedelta(worktime),
                     format_time_diff(time_diff(worktime, self.planned(date))),
-                    events_graph(
+                    events.graph(
                         day_events,
                         start=datetime.time(0, 0, 0),
                         end=datetime.time(23, 59, 59),
@@ -133,78 +147,10 @@ class WorkHours:
         print("Total: " + format_time_diff(acc_time_diff_total))
 
 
-def time_in_range(x, start, end):
-    """Return true if x is in the range [start, end]"""
-    if start <= end:
-        return start <= x <= end
-    else:
-        return start <= x or x <= end
-
-
-def events_graph(
-    events,
-    start=datetime.time(8, 0, 0),
-    end=datetime.time(17, 0, 0),
-    resolution=datetime.timedelta(minutes=15),
-):
-
-    dt = datetime.datetime(100, 1, 1)
-    range_start = datetime.datetime.combine(dt, start)
-    range_end = datetime.datetime.combine(dt, end)
-
-    time_histogram = []
-
-    entry = range_start + resolution / 2.0
-    while entry < range_end + resolution / 2.0:
-        time_histogram.append(entry)
-        entry += resolution
-
-    ret_val = "[]"
-    for t in time_histogram:
-        inside = False
-        for event in events:
-            event_start = dt.combine(dt, get_datetime(event, "start").time())
-            event_end = dt.combine(dt, get_datetime(event, "end").time())
-            if time_in_range(t, event_start, event_end):
-                inside = True
-                break
-        if inside:
-            ret_val += event["summary"][0:1]
-        else:
-            ret_val += " "
-
-    return ret_val + "[]"
-
-
 def event_duration(event):
     return datetime.datetime.fromisoformat(
         event["end"].get("dateTime")
     ) - datetime.datetime.fromisoformat(event["start"].get("dateTime"))
-
-
-def format_event(event):
-    start = get_datetime(event, "start")
-    end = get_datetime(event, "end")
-    duration = format_time_diff(event_duration(event).total_seconds(), plus_sign="")
-    description = ""
-    try:
-        description = event["description"]
-    except KeyError:
-        pass
-    return "{} {}-{} ({}) {} [{}] : {}".format(
-        start.date(),
-        start.time(),
-        end.time(),
-        duration,
-        event["summary"],
-        event["id"],
-        description,
-    )
-
-
-def print_events(events):
-    for event in events:
-        print(format_event(event))
 
 
 def generate_event(start, end, summary, description, location):
@@ -233,7 +179,7 @@ def generate_event(start, end, summary, description, location):
 
 
 def create_new_event(service, event, args):
-    calendar_id = get_calendar_id(service, args.calendar)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
     event = service.events().insert(calendar_id=calendar_id, body=event).execute()
     print("Event created: %s" % (event.get("htmlLink")))
 
@@ -243,7 +189,7 @@ def start(args, service, wh):
     if len(ongoing_events) > 0:
         print("There are {} ongoing evnts, consider stopping them before starting new.")
         for event in ongoing_events:
-            print(format_event(event))
+            print(events.format_event(event))
         if len(ongoing_events) == 1:
             if query_yes_no("Stop the ongoing event at this time", default="no"):
                 utc = pytz.timezone("UTC")
@@ -253,7 +199,7 @@ def start(args, service, wh):
                 )
                 utc_end = end_time.astimezone(utc)
                 event["end"]["dateTime"] = utc_end.isoformat()
-                calendar_id = get_calendar_id(service, args.calendar)
+                calendar_id = cal.get_calendar_id(service, args.calendar)
                 updated_event = (
                     service.events()
                     .update(calendar_id=calendar_id, eventId=event["id"], body=event)
@@ -272,7 +218,7 @@ def start(args, service, wh):
 
 
 def stop(args, service, wh):
-    calendar_id = get_calendar_id(service, args.calendar)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
     # Find latest event with same start and stop time
     possible_events = find_ongoing_events(service, args)
 
@@ -284,7 +230,7 @@ def stop(args, service, wh):
 
     # Show suggested event
     print("Event to update:")
-    print(format_event(event))
+    print(events.format_event(event))
 
     # Confirm update
     if args.force or query_yes_no("Stop that event", "no"):
@@ -299,8 +245,8 @@ def stop(args, service, wh):
 
 
 def find_ongoing_events(service, args):
-    calendar_id = get_calendar_id(service, args.calendar)
-    all_events = get_all_events(service, calendar_id)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
+    all_events = cal.get_all_events(service, calendar_id)
     possible_events = []
     for event in all_events:
         if event_duration(event).total_seconds() == 0.0:
@@ -340,7 +286,7 @@ def query_yes_no(question, default="yes"):
 
 
 def update_event(event, service, args):
-    calendar_id = get_calendar_id(service, args.calendar)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
     updated_event = (
         service.events()
         .update(calendar_id=calendar_id, eventId=event["id"], body=event)
@@ -378,10 +324,10 @@ def patch_event(event, args):
 
 
 def update(args, service, wh):
-    calendar_id = get_calendar_id(service, args.calendar)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
     event = service.events().get(calendar_id=calendar_id, eventId=args.id).execute()
     print("Replace event")
-    print(format_event(event))
+    print(events.format_event(event))
     print("with:")
     new_event = patch_event(event, args)
     print(new_event)
@@ -408,18 +354,18 @@ def filter_events(events, start, end):
 
 
 def list(args, service, wh):
-    calendar_id = get_calendar_id(service, args.calendar)
-    all_events = get_all_events(service, calendar_id)
+    calendar_id = cal.get_calendar_id(service, args.calendar)
+    all_events = cal.get_all_events(service, calendar_id)
     events = filter_events(all_events, args.start, args.end)
     print_events(events)
 
 
 def delete(args, service, wh):
     for id in args.ids:
-        calendar_id = get_calendar_id(service, args.calendar)
+        calendar_id = cal.get_calendar_id(service, args.calendar)
         event = service.events().get(calendar_id=calendar_id, eventId=id).execute()
         print("Delete event")
-        print(format_event(event))
+        print(events.format_event(event))
         if args.force or query_yes_no("Delete the above evetn?", default="no"):
             service.events().delete(calendar_id=calendar_id, eventId=id).execute()
 
@@ -435,22 +381,6 @@ def get_first_date(all_events):
         if earliest_date > start:
             earliest_date = start
     return earliest_date
-
-
-def get_datetime(event, entity):
-    start = datetime.datetime.strptime(
-        event[entity].get("dateTime", event[entity].get("date")), "%Y-%m-%dT%H:%M:%S%z"
-    )
-    return start
-
-
-def get_events_on_date(all_events, date):
-    events = []
-    for event in all_events:
-        start = get_datetime(event, "start").date()
-        if start == date:
-            events.append(event)
-    return events
 
 
 class DeltaTemplate(Template):
@@ -667,7 +597,7 @@ def main():
     with open("work-hours.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
 
-    service = authenticate()
+    service = cal.authenticate()
     wh = WorkHours(service, config, args)
 
     args.func(args, service, wh)
