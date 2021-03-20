@@ -1,0 +1,6 @@
+*.pyc
+credentials.json
+token.pickle
+.vscode/settings.json
+*.log
+times_from_before.csv
