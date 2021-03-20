@@ -1,0 +1,39 @@
+# Work Hours
+
+A work hours time keeper using a google calendar as database.
+
+## Configuration
+
+### Google API connection
+
+Follow the instructions here to set up a google app API and connect the app by dropping your credentials.json file in the folder.
+
+https://developers.google.com/gmail/api/quickstart/python
+
+### Planned Work hours
+
+Configure your expected work hours in a yaml file on the format
+
+Example:
+----
+---
+expected:
+  - startdate: "2019-12-01"
+    hours:
+      - 7.2
+      - 7.2
+      - 7.2
+      - 7.2
+      - 7.2
+      - 0.0
+      - 0.0
+  - startdate: "2019-09-05"
+    hours:
+      - 6.4
+      - 6.4
+      - 6.4
+      - 6.4
+      - 6.4
+      - 0.0
+      - 0.0
+----
