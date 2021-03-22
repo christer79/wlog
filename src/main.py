@@ -3,7 +3,6 @@
 import datetime
 import pytz
 import sys
-import math
 import argparse
 import yaml
 from string import Template
@@ -59,7 +58,7 @@ class WorkHours:
             if event["summary"] in FULLDAYOFFS:
                 duration = duration + self.planned(get_datetime(event, "start").date())
             elif event["summary"] not in IGNORED:
-                duration = duration + event_duration(event)
+                duration = duration + event_utils.event_duration(event)
         return duration
 
     def total_worktime(self, events):
@@ -70,7 +69,7 @@ class WorkHours:
                     event_utils.get_datetime(event, "start").date()
                 )
             elif event["summary"] not in IGNORED:
-                duration = duration + event_duration(event)
+                duration = duration + event_utils.event_duration(event)
         return duration
 
     def day_summary(self):
@@ -81,7 +80,9 @@ class WorkHours:
         total_worktime = self.total_worktime(events_on_day)
         print(
             f"\nTotal time worked today: {total_worktime}/{self.planned(today)}",
-            format_time_diff(time_diff(total_worktime, self.planned(today))),
+            event_utils.format_time_diff(
+                time_diff(total_worktime, self.planned(today))
+            ),
         )
 
     def summary(self):
@@ -109,14 +110,14 @@ class WorkHours:
                         " ** WEEK {} SUMMARY: ".format(
                             (date - day_delta).isocalendar()[1]
                         )
-                        + format_time_diff(acc_time_diff_week)
+                        + event_utils.format_time_diff(acc_time_diff_week)
                     )
                 acc_time_diff_week = 0.0
             if date.day == 1:
                 if self.args.months:
                     print(
                         " **** {} SUMMARY: ".format((date - day_delta).strftime("%B"))
-                        + format_time_diff(acc_time_diff_month)
+                        + event_utils.format_time_diff(acc_time_diff_month)
                     )
                 acc_time_diff_month = 0.0
 
@@ -133,7 +134,9 @@ class WorkHours:
                     color,
                     date,
                     format_timedelta(worktime),
-                    format_time_diff(time_diff(worktime, self.planned(date))),
+                    event_utils.format_time_diff(
+                        time_diff(worktime, self.planned(date))
+                    ),
                     event_utils.graph(
                         day_events,
                         start=datetime.time(0, 0, 0),
@@ -141,15 +144,9 @@ class WorkHours:
                         resolution=datetime.timedelta(minutes=15),
                     ),
                     bcolors.ENDC,
-                    format_time_diff(acc_time_diff_total),
+                    event_utils.format_time_diff(acc_time_diff_total),
                 )
-        print("Total: " + format_time_diff(acc_time_diff_total))
-
-
-def event_duration(event):
-    return datetime.datetime.fromisoformat(
-        event["end"].get("dateTime")
-    ) - datetime.datetime.fromisoformat(event["start"].get("dateTime"))
+        print("Total: " + event_utils.format_time_diff(acc_time_diff_total))
 
 
 def generate_event(start, end, summary, description, location):
@@ -179,7 +176,7 @@ def generate_event(start, end, summary, description, location):
 
 def create_new_event(service, event, args):
     calendar_id = cal.get_calendar_id(service, args.calendar)
-    event = service.events().insert(calendar_id=calendar_id, body=event).execute()
+    event = service.events().insert(calendarId=calendar_id, body=event).execute()
     print("Event created: %s" % (event.get("htmlLink")))
 
 
@@ -201,7 +198,7 @@ def start(args, service, wh):
                 calendar_id = cal.get_calendar_id(service, args.calendar)
                 updated_event = (
                     service.events()
-                    .update(calendar_id=calendar_id, eventId=event["id"], body=event)
+                    .update(calendarId=calendar_id, eventId=event["id"], body=event)
                     .execute()
                 )
                 print(updated_event["updated"])
@@ -237,7 +234,7 @@ def stop(args, service, wh):
         new_event = patch_event(event, args)
         updated_event = (
             service.events()
-            .update(calendar_id=calendar_id, eventId=new_event["id"], body=new_event)
+            .update(calendarId=calendar_id, eventId=new_event["id"], body=new_event)
             .execute()
         )
         print(updated_event["updated"])
@@ -248,8 +245,8 @@ def find_ongoing_events(service, args):
     all_events = cal.get_all_events(service, calendar_id)
     possible_events = []
     for event in all_events:
-        if event_duration(event).total_seconds() == 0.0:
-            possible_event_utils.append(event)
+        if event_utils.event_duration(event).total_seconds() == 0.0:
+            possible_events.append(event)
     return possible_events
 
 
@@ -288,7 +285,7 @@ def update_event(event, service, args):
     calendar_id = cal.get_calendar_id(service, args.calendar)
     updated_event = (
         service.events()
-        .update(calendar_id=calendar_id, eventId=event["id"], body=event)
+        .update(calendarId=calendar_id, eventId=event["id"], body=event)
         .execute()
     )
     print(updated_event["updated"])
@@ -324,7 +321,7 @@ def patch_event(event, args):
 
 def update(args, service, wh):
     calendar_id = cal.get_calendar_id(service, args.calendar)
-    event = service.events().get(calendar_id=calendar_id, eventId=args.id).execute()
+    event = service.events().get(calendarId=calendar_id, eventId=args.id).execute()
     print("Replace event")
     print(event_utils.format_event(event))
     print("with:")
@@ -362,11 +359,11 @@ def list(args, service, wh):
 def delete(args, service, wh):
     for id in args.ids:
         calendar_id = cal.get_calendar_id(service, args.calendar)
-        event = service.events().get(calendar_id=calendar_id, eventId=id).execute()
+        event = service.events().get(calendarId=calendar_id, eventId=id).execute()
         print("Delete event")
         print(event_utils.format_event(event))
         if args.force or query_yes_no("Delete the above evetn?", default="no"):
-            service.events().delete(calendar_id=calendar_id, eventId=id).execute()
+            service.events().delete(calendarId=calendar_id, eventId=id).execute()
 
 
 def get_first_date(all_events):
@@ -395,28 +392,6 @@ def format_timedelta(tdelta, fmt="%H:%M:%S"):
     d["S"] = "{:02d}".format(seconds)
     t = DeltaTemplate(fmt)
     return t.substitute(**d)
-
-
-def format_time_diff(diff_seconds, plus_sign="+"):
-    if diff_seconds > 0.0:
-        sign = +1
-        sign_str = plus_sign
-    else:
-        sign = -1
-        sign_str = "-"
-    diff_seconds = diff_seconds * sign
-    hours = math.floor(diff_seconds // 3600)
-    diff_seconds %= 3600
-    minutes = math.floor(diff_seconds // 60)
-    diff_seconds %= 60
-    seconds = math.floor(diff_seconds)
-    WARN = ""
-    if hours > 3:
-        WARN = "<"
-    else:
-        WARN = " "
-
-    return "{}{:02d}:{:02d}:{:02d} {}".format(sign_str, hours, minutes, seconds, WARN)
 
 
 def time_diff(actual_worktime, expected_worktime):

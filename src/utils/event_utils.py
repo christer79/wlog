@@ -1,5 +1,5 @@
 import datetime
-from string import Template
+import math
 
 
 def time_in_range(x, start, end):
@@ -8,6 +8,34 @@ def time_in_range(x, start, end):
         return start <= x <= end
     else:
         return start <= x or x <= end
+
+
+def format_time_diff(diff_seconds, plus_sign="+"):
+    if diff_seconds > 0.0:
+        sign = +1
+        sign_str = plus_sign
+    else:
+        sign = -1
+        sign_str = "-"
+    diff_seconds = diff_seconds * sign
+    hours = math.floor(diff_seconds // 3600)
+    diff_seconds %= 3600
+    minutes = math.floor(diff_seconds // 60)
+    diff_seconds %= 60
+    seconds = math.floor(diff_seconds)
+    WARN = ""
+    if hours > 3:
+        WARN = "<"
+    else:
+        WARN = " "
+
+    return "{}{:02d}:{:02d}:{:02d} {}".format(sign_str, hours, minutes, seconds, WARN)
+
+
+def event_duration(event):
+    return datetime.datetime.fromisoformat(
+        event["end"].get("dateTime")
+    ) - datetime.datetime.fromisoformat(event["start"].get("dateTime"))
 
 
 def format_event(event):
