@@ -56,7 +56,9 @@ class WorkHours:
         duration = datetime.timedelta()
         for event in events:
             if event["summary"] in FULLDAYOFFS:
-                duration = duration + self.planned(get_datetime(event, "start").date())
+                duration = duration + self.planned(
+                    event_utils.get_datetime(event, "start").date()
+                )
             elif event["summary"] not in IGNORED:
                 duration = duration + event_utils.event_duration(event)
         return duration
@@ -343,9 +345,9 @@ def create(args, service, wh):
 def filter_events(events, start, end):
     ret_events = []
     for event in events:
-        event_start = get_datetime(event, "start")
+        event_start = event_utils.get_datetime(event, "start")
         if event_start.date() >= start.date() and event_start.date() <= end.date():
-            ret_event_utils.append(event)
+            ret_events.append(event)
     return ret_events
 
 
@@ -353,7 +355,7 @@ def list(args, service, wh):
     calendar_id = cal.get_calendar_id(service, args.calendar)
     all_events = cal.get_all_events(service, calendar_id)
     events = filter_events(all_events, args.start, args.end)
-    print_events(events)
+    event_utils.print_events(events)
 
 
 def delete(args, service, wh):
